@@ -1,0 +1,57 @@
+pipeline {
+    agent any
+
+    environment {
+        BOT_TOKEN = "${env.BOT_TOKEN}"
+        CHAT_ID = "${env.CHAT_ID}"
+    }
+
+    tools {
+        maven 'Maven'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git url: 'https://github.com/timmy1496/gs-spring-boot-fork', branch: 'main'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir('complete') {
+                    sh 'mvn clean install'
+                }
+            }
+        }
+
+        stage('Archive') {
+            steps {
+                archiveArtifacts artifacts: 'complete/target/*.jar', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Build completed successfully!'
+            script {
+                sh '''
+                curl -s -X POST https://api.telegram.org/bot${BOT_TOKEN}/sendMessage \
+                    -d chat_id=${CHAT_ID} \
+                    -d text="Build SUCCESS in Jenkins Job: ${JOB_NAME} #${BUILD_NUMBER}️"
+                '''
+            }
+        }
+        failure {
+            echo 'Build failed.'
+            script {
+                sh '''
+                curl -s -X POST https://api.telegram.org/bot${BOT_TOKEN}/sendMessage \
+                    -d chat_id=${CHAT_ID} \
+                    -d text="Build FAILED in Jenkins Job: ${JOB_NAME} #${BUILD_NUMBER}"
+                '''
+            }
+        }
+    }
+}
