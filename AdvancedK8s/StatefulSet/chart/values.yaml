@@ -1,0 +1,21 @@
+replicas: 2
+
+image:
+  repository: redis
+  tag: 7-alpine
+  pullPolicy: IfNotPresent
+
+service:
+  name: redis
+  port: 6379
+
+persistence:
+  enabled: true
+  storageClassName: standard
+  size: 1Gi
+  accessModes:
+    - ReadWriteOnce
+
+redis:
+  aofEnabled: true
+  dataMountPath: /data

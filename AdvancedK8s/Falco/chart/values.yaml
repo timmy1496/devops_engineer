@@ -1,0 +1,51 @@
+namespace: kube-system
+
+image:
+  repository: falcosecurity/falco
+  tag: latest
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 100m
+    memory: 256Mi
+
+securityContext:
+  privileged: true
+
+host:
+  hostPID: true
+  hostNetwork: true
+
+tolerations:
+  - operator: Exists
+
+mounts:
+  proc:
+    enabled: true
+    hostPath: /proc
+    mountPath: /host/proc
+    type: Directory
+  boot:
+    enabled: true
+    hostPath: /boot
+    mountPath: /host/boot
+    type: DirectoryOrCreate
+  libModules:
+    enabled: true
+    hostPath: /lib/modules
+    mountPath: /host/lib/modules
+    type: Directory
+  usr:
+    enabled: true
+    hostPath: /usr
+    mountPath: /host/usr
+    type: Directory
+  dockerSock:
+    enabled: true
+    hostPath: /var/run/docker.sock
+    mountPath: /var/run/docker.sock
+    type: Socket
