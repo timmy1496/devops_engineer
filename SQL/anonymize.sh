@@ -35,7 +35,7 @@ SELECT
   i.institution_name,
   i.address,
   cl.class_name,
-  cl.direction,
+  cl.institution_direction,
   p.parent_id,
   p.first_name AS parent_first_name,
   p.last_name  AS parent_last_name,
