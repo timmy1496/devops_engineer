@@ -5,7 +5,7 @@ SELECT
     i.institution_name,
     i.institution_type,
     cl.class_name,
-    cl.direction
+    cl.institution_direction
 FROM Children c
          JOIN Institutions i ON i.institution_id = c.institution_id
          JOIN Classes cl ON cl.class_id = c.class_id
