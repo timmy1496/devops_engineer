@@ -1,0 +1,6 @@
+apiVersion: v2
+name: falco-daemonset
+description: Falco deployed as DaemonSet (kube-system) with required host mounts
+type: application
+version: 0.1.0
+appVersion: "latest"
