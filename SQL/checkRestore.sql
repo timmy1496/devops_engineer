@@ -16,7 +16,7 @@ USE SchoolDB_Restore;
 
 SELECT
     c.child_id, c.first_name, c.last_name,
-    i.institution_name, cl.direction
+    i.institution_name, cl.institution_direction
 FROM Children c
          JOIN Institutions i ON i.institution_id = c.institution_id
          JOIN Classes cl ON cl.class_id = c.class_id;
