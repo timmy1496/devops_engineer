@@ -5,7 +5,7 @@ INSERT INTO Institutions (institution_name, institution_type, address) VALUES
                                                                            ('Lviv Gymnasium "Harmony"', 'School', 'Lviv, Hnatyuka St. 5'),
                                                                            ('Kindergarten "Sunflower"', 'Kindergarten', 'Kyiv, Peremohy Ave. 120');
 
-INSERT INTO Classes (class_name, institution_id, direction) VALUES
+INSERT INTO Classes (class_name, institution_id, institution_direction) VALUES
                                                                 ('5-A', 1, 'Mathematics'),
                                                                 ('7-B', 2, 'Language Studies'),
                                                                 ('Senior Group', 3, 'Biology and Chemistry');
