@@ -38,6 +38,15 @@ variable "instance_type" {
   default = "t2.micro"
 }
 
+variable "architecture" {
+  type    = string
+  default = "x86_64"
+  validation {
+    condition     = contains(["x86_64", "arm64"], var.architecture)
+    error_message = "architecture must be either 'x86_64' or 'arm64'"
+  }
+}
+
 variable "key_name" {
   type    = string
   default = "timmy-key"
