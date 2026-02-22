@@ -14,6 +14,7 @@ locals {
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
+  map_public_ip_on_launch = true
   version = "~> 5.0"
 
   name = "${local.name}-vpc"
