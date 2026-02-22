@@ -1,4 +1,4 @@
-data "aws_ami" "amazon_linux_2" {
+data "aws_ami" "amazon_linux_2_x86_64" {
   most_recent = true
   owners      = ["amazon"]
 
@@ -18,6 +18,26 @@ data "aws_ami" "amazon_linux_2" {
   }
 }
 
+data "aws_ami" "amazon_linux_2_arm64" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-arm64-gp2"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["arm64"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 resource "aws_key_pair" "this" {
   count      = var.create_key_pair ? 1 : 0
   key_name   = var.key_name
@@ -26,10 +46,11 @@ resource "aws_key_pair" "this" {
 
 locals {
   effective_key_name = var.create_key_pair ? aws_key_pair.this[0].key_name : var.key_name
+  selected_ami_id    = var.architecture == "arm64" ? data.aws_ami.amazon_linux_2_arm64.id : data.aws_ami.amazon_linux_2_x86_64.id
 }
 
 resource "aws_instance" "this" {
-  ami                    = data.aws_ami.amazon_linux_2.id
+  ami                    = local.selected_ami_id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
