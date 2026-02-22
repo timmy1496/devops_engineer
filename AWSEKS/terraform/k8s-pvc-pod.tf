@@ -1,4 +1,5 @@
 resource "kubernetes_storage_class" "gp3" {
+  depends_on = [module.eks, aws_eks_addon.ebs_csi]
   metadata {
     name = "gp3"
   }

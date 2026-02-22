@@ -1,4 +1,5 @@
 resource "kubernetes_config_map" "site" {
+  depends_on = [module.eks, aws_eks_addon.ebs_csi]
   metadata {
     name = "static-site"
   }

@@ -1,4 +1,5 @@
 resource "kubernetes_job" "hello" {
+  depends_on = [module.eks, aws_eks_addon.ebs_csi]
   metadata {
     name = "hello-job"
   }

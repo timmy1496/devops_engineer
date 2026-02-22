@@ -1,4 +1,5 @@
 resource "kubernetes_deployment" "test_app" {
+  depends_on = [module.eks, aws_eks_addon.ebs_csi]
   metadata {
     name = "test-app"
     labels = { app = "test-app" }

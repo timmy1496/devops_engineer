@@ -1,4 +1,5 @@
 resource "kubernetes_namespace" "dev" {
+  depends_on = [module.eks, aws_eks_addon.ebs_csi]
   metadata {
     name = "dev"
   }
