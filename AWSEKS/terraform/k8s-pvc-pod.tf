@@ -1,5 +1,8 @@
 resource "kubernetes_storage_class" "gp3" {
-  depends_on = [module.eks, aws_eks_addon.ebs_csi]
+  depends_on = [
+      module.eks,
+      aws_eks_access_policy_association.current_admin
+  ]
   metadata {
     name = "gp3"
   }
@@ -23,7 +26,7 @@ resource "kubernetes_persistent_volume_claim" "data" {
 
     resources {
       requests = {
-        storage = "5Gi"
+        storage = "1Gi"
       }
     }
 
