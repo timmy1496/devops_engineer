@@ -1,0 +1,22 @@
+resource "kubernetes_job" "hello" {
+  metadata {
+    name = "hello-job"
+  }
+
+  spec {
+    template {
+      metadata {}
+      spec {
+        restart_policy = "Never"
+
+        container {
+          name  = "hello"
+          image = "busybox:1.36"
+          command = ["sh", "-c", "echo 'Hello from EKS!'"]
+        }
+      }
+    }
+
+    backoff_limit = 1
+  }
+}
