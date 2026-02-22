@@ -42,7 +42,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
 
-  cluster_name    = "${local.name}-cluster"
+  cluster_name    = "eks-timmy"
   cluster_version = var.k8s_version
 
   vpc_id     = module.vpc.vpc_id
@@ -54,7 +54,7 @@ module "eks" {
 
   eks_managed_node_groups = {
     public_ng = {
-      name           = "${local.name}-public-ng"
+      name           = "eks-timmy-public-ng"
       instance_types = [var.node_instance_type]
 
       min_size     = 2
