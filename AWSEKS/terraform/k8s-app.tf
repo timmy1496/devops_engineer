@@ -36,6 +36,11 @@ resource "kubernetes_deployment" "test_app" {
 }
 
 resource "kubernetes_service" "test_app" {
+  depends_on = [
+    module.eks,
+    aws_eks_access_policy_association.current_admin,
+    time_sleep.wait_for_access
+  ]
   metadata {
     name = "test-app"
   }

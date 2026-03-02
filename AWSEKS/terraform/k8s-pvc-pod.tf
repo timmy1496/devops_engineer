@@ -18,6 +18,12 @@ resource "kubernetes_storage_class" "gp3" {
 }
 
 resource "kubernetes_persistent_volume_claim" "data" {
+  depends_on = [
+      module.eks,
+      aws_eks_access_policy_association.current_admin,
+      time_sleep.wait_for_access,
+      kubernetes_storage_class.gp3
+  ]
   metadata {
     name = "data-pvc"
   }
@@ -36,6 +42,12 @@ resource "kubernetes_persistent_volume_claim" "data" {
 }
 
 resource "kubernetes_pod" "pvc_writer" {
+  depends_on = [
+      module.eks,
+      aws_eks_access_policy_association.current_admin,
+      time_sleep.wait_for_access,
+      kubernetes_persistent_volume_claim.data
+  ]
   metadata {
     name = "pvc-writer"
   }

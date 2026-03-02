@@ -23,5 +23,5 @@ resource "aws_eks_access_policy_association" "current_admin" {
 # Wait for access entry and policy to propagate
 resource "time_sleep" "wait_for_access" {
   depends_on = [aws_eks_access_policy_association.current_admin]
-  create_duration = "30s"
+  create_duration = "60s"
 }

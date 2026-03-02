@@ -10,6 +10,12 @@ resource "kubernetes_namespace" "dev" {
 }
 
 resource "kubernetes_deployment" "busybox_dev" {
+  depends_on = [
+      module.eks,
+      aws_eks_access_policy_association.current_admin,
+      time_sleep.wait_for_access,
+      kubernetes_namespace.dev
+  ]
   metadata {
     name      = "busybox-sleeper"
     namespace = kubernetes_namespace.dev.metadata[0].name
