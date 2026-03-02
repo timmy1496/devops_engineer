@@ -2,7 +2,7 @@ resource "kubernetes_config_map" "site" {
   depends_on = [
       module.eks,
       aws_eks_access_policy_association.current_admin,
-      aws_eks_access_policy_association.user_admin
+      time_sleep.wait_for_access
   ]
   metadata {
     name = "static-site"
@@ -23,6 +23,11 @@ resource "kubernetes_config_map" "site" {
 }
 
 resource "kubernetes_deployment" "nginx_site" {
+  depends_on = [
+    module.eks,
+    aws_eks_access_policy_association.current_admin,
+    time_sleep.wait_for_access
+  ]
   metadata {
     name = "nginx-site"
     labels = { app = "nginx-site" }
@@ -68,6 +73,11 @@ resource "kubernetes_deployment" "nginx_site" {
 }
 
 resource "kubernetes_service" "nginx_lb" {
+  depends_on = [
+    module.eks,
+    aws_eks_access_policy_association.current_admin,
+    time_sleep.wait_for_access
+  ]
   metadata {
     name = "nginx-site-lb"
   }

@@ -2,7 +2,7 @@ resource "kubernetes_storage_class" "gp3" {
   depends_on = [
       module.eks,
       aws_eks_access_policy_association.current_admin,
-      aws_eks_access_policy_association.user_admin
+      time_sleep.wait_for_access
   ]
   metadata {
     name = "gp3"
