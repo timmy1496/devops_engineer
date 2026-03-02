@@ -23,6 +23,9 @@ resource "kubernetes_storage_class" "gp3" {
 }
 
 resource "kubernetes_persistent_volume_claim" "data" {
+  timeouts {
+    create = "20m"
+  }
   depends_on = [
       module.eks,
       aws_eks_access_policy_association.current_admin,
