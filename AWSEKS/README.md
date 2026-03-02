@@ -8,7 +8,7 @@
 
 ### Основні параметри:
 
-- Kubernetes version: 1.29
+- Kubernetes version: 1.35
 - 2 worker nodes
 - Тип інстансів: `t3.medium`
 - Node Group розгорнуто у публічних підмережах
