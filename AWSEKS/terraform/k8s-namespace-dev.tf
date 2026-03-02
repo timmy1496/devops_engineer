@@ -1,7 +1,8 @@
 resource "kubernetes_namespace" "dev" {
   depends_on = [
       module.eks,
-      aws_eks_access_policy_association.current_admin
+      aws_eks_access_policy_association.current_admin,
+      aws_eks_access_policy_association.user_admin
   ]
   metadata {
     name = "dev"
