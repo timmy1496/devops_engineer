@@ -14,7 +14,7 @@ resource "kubernetes_storage_class" "gp3" {
 
   storage_provisioner = "ebs.csi.aws.com"
   reclaim_policy      = "Delete"
-  volume_binding_mode  = "WaitForFirstConsumer"
+  volume_binding_mode  = "Immediate"
 
   parameters = {
     type = "gp3"
