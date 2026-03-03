@@ -15,8 +15,6 @@ Parameters:
     Type: String
     Default: "${ProjectName}-private-bucket"
     Description: Globally unique S3 bucket name (lowercase, no spaces)
-    AllowedPattern: "^[a-z0-9.-]{3,63}$"
-    ConstraintDescription: "Bucket name must be 3-63 chars, lowercase letters/numbers/dot/hyphen only."
 
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
