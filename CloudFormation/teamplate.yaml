@@ -3,7 +3,7 @@ Description: CloudFormation stack with VPC, EC2, IAM Role and S3 Bucket
 
 Resources:
 
-  MyVPC:
+  TimmyVPC:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: 10.0.0.0/16
@@ -11,12 +11,12 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: MyVPC
+          Value: TimmyVPC
 
   PublicSubnet:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref MyVPC
+      VpcId: !Ref TimmyVPC
       CidrBlock: 10.0.1.0/24
       AvailabilityZone: eu-north-1a
       MapPublicIpOnLaunch: true
@@ -30,13 +30,13 @@ Resources:
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !Ref MyVPC
+      VpcId: !Ref TimmyVPC
       InternetGatewayId: !Ref InternetGateway
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref MyVPC
+      VpcId: !Ref TimmyVPC
 
   PublicRoute:
     Type: AWS::EC2::Route
@@ -55,7 +55,7 @@ Resources:
   EC2Role:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: EC2S3ReadOnlyRole
+      RoleName: TimmyS3ReadOnlyRole
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -79,14 +79,14 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow SSH access
-      VpcId: !Ref MyVPC
+      VpcId: !Ref TimmyVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: 0.0.0.0/0
 
-  EC2Instance:
+  TimmyEC2Instance:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t3.micro
@@ -98,7 +98,7 @@ Resources:
       IamInstanceProfile: !Ref EC2InstanceProfile
       Tags:
         - Key: Name
-          Value: MyEC2Instance
+          Value: TimmyEC2Instance
 
   TimmyS3Bucket:
     Type: AWS::S3::Bucket
@@ -125,7 +125,7 @@ Outputs:
 
   EC2PublicIP:
     Description: Public IP of the EC2 instance
-    Value: !GetAtt EC2Instance.PublicIp
+    Value: !GetAtt TimmyEC2Instance.PublicIp
 
   S3BucketName:
     Description: Name of the S3 bucket
