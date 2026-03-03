@@ -1,13 +1,33 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   Task: VPC (10.0.0.0/16) + Public Subnet (10.0.1.0/24) + IGW + RouteTable,
   EC2 t2.micro (Amazon Linux 2) in public subnet, IAM Role with S3 ReadOnly,
-  private S3 bucket with versioning + bucket policy restriction, outputs.
-  Region adapted to eu-north-1.
+  private S3 bucket with versioning + restrictive bucket policy (HTTPS only),
+  outputs. Region: eu-north-1.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: timmy
+    Description: Prefix for naming resources
+
+  BucketName:
+    Type: String
+    Description: Globally unique S3 bucket name (lowercase, no spaces)
+    AllowedPattern: "^[a-z0-9.-]{3,63}$"
+    ConstraintDescription: "Bucket name must be 3-63 chars, lowercase letters/numbers/dot/hyphen only."
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 KeyPair name for SSH access
+
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+    Description: Amazon Linux 2 AMI ID (resolved via SSM public parameter)
 
 Resources:
-
-  TimmyVPC:
+  VPC:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: 10.0.0.0/16
@@ -15,122 +35,185 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: TimmyVPC
+          Value: !Sub "${ProjectName}-vpc"
+        - Key: Project
+          Value: !Ref ProjectName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-igw"
+        - Key: Project
+          Value: !Ref ProjectName
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
 
   PublicSubnet:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref TimmyVPC
+      VpcId: !Ref VPC
       CidrBlock: 10.0.1.0/24
-      AvailabilityZone: eu-north-1a
+      # Avoid hardcoding eu-north-1a (AZ letters differ per account)
+      AvailabilityZone: !Select [0, !GetAZs ""]
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: PublicSubnet
-
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-
-  AttachGateway:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref TimmyVPC
-      InternetGatewayId: !Ref InternetGateway
+          Value: !Sub "${ProjectName}-public-subnet"
+        - Key: Project
+          Value: !Ref ProjectName
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref TimmyVPC
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-public-rt"
+        - Key: Project
+          Value: !Ref ProjectName
 
-  PublicRoute:
+  DefaultRouteToInternet:
     Type: AWS::EC2::Route
-    DependsOn: AttachGateway
+    DependsOn: VPCGatewayAttachment
     Properties:
       RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-  SubnetRouteTableAssociation:
+  PublicSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
 
-  EC2Role:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: TimmyS3ReadOnlyRole
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ec2.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
-
-  TimmyInstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      InstanceProfileName: TimmyS3ReadOnlyInstanceProfile
-      Roles:
-        - !Ref EC2Role
-
-  EC2SecurityGroup:
+  InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow SSH access
-      VpcId: !Ref TimmyVPC
+      GroupDescription: Allow SSH from anywhere (task helper)
+      VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: 0.0.0.0/0
-
-  TimmyEC2Instance:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: t3.micro
-      ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}"
-
-      SubnetId: !Ref PublicSubnet
-      SecurityGroupIds:
-        - !Ref EC2SecurityGroup
-      IamInstanceProfile: !Ref TimmyInstanceProfile
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
-          Value: TimmyEC2Instance
+          Value: !Sub "${ProjectName}-sg"
+        - Key: Project
+          Value: !Ref ProjectName
 
-  TimmyS3Bucket:
-    Type: AWS::S3::Bucket
+  Ec2S3ReadOnlyRole:
+    Type: AWS::IAM::Role
     Properties:
-      BucketName: timmy-bucket-1234567890
-      VersioningConfiguration:
-        Status: Enabled
-
-  TimmyS3BucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref TimmyS3Bucket
-      PolicyDocument:
+      AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !GetAtt EC2Role.Arn
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref Ec2S3ReadOnlyRole
+
+  PrivateBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  PrivateBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PrivateBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !Sub "arn:aws:s3:::${BucketName}"
+              - !Sub "arn:aws:s3:::${BucketName}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+          - Sid: DenyAllExceptEc2Role
+            Effect: Deny
+            NotPrincipal:
+              AWS: !GetAtt Ec2S3ReadOnlyRole.Arn
             Action:
               - s3:GetObject
-            Resource: !Sub "${TimmyS3Bucket.Arn}/*"
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::${BucketName}"
+              - !Sub "arn:aws:s3:::${BucketName}/*"
+
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: t2.micro
+      SubnetId: !Ref PublicSubnet
+      KeyName: !Ref KeyName
+      IamInstanceProfile: !Ref Ec2InstanceProfile
+      SecurityGroupIds:
+        - !Ref InstanceSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-ec2"
+        - Key: Project
+          Value: !Ref ProjectName
 
 Outputs:
-
   EC2PublicIP:
     Description: Public IP of the EC2 instance
-    Value: !GetAtt TimmyEC2Instance.PublicIp
+    Value: !GetAtt EC2Instance.PublicIp
+
+  EC2InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref EC2Instance
+
+  VpcId:
+    Description: VPC ID
+    Value: !Ref VPC
+
+  PublicSubnetId:
+    Description: Public Subnet ID
+    Value: !Ref PublicSubnet
 
   S3BucketName:
-    Description: Name of the S3 bucket
-    Value: !Ref TimmyS3Bucket
+    Description: Name of the created S3 bucket
+    Value: !Ref PrivateBucket
+
+  S3BucketArn:
+    Description: ARN of the created S3 bucket
+    Value: !GetAtt PrivateBucket.Arn
