@@ -142,14 +142,15 @@ resource "aws_iam_instance_profile" "this" {
   role = aws_iam_role.ec2_s3_readonly.name
 }
 
-resource "aws_s3_bucket" "private" {
-  bucket = var.bucket_name
-
-  force_destroy = false
-
-  tags = local.tags
+resource "random_id" "suffix" {
+  byte_length = 4
 }
 
+resource "aws_s3_bucket" "private" {
+  bucket = "${var.bucket_name}-${random_id.suffix.hex}"
+  force_destroy = false
+  tags   = local.tags
+}
 
 resource "aws_s3_bucket_versioning" "private" {
   bucket = aws_s3_bucket.private.id
