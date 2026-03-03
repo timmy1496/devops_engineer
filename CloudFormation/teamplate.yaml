@@ -17,7 +17,7 @@ Parameters:
     Description: Globally unique S3 bucket name (lowercase, no spaces)
 
   KeyName:
-    Type: AWS::EC2::KeyPair::KeyName
+    Type: AWS::EC2::KeyPair::timmy-key
     Description: EC2 KeyPair name for SSH access
 
   AmiId:
