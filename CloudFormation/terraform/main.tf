@@ -221,7 +221,7 @@ resource "aws_s3_bucket_policy" "private" {
 
 resource "aws_instance" "this" {
   ami                    = data.aws_ami.amazon_linux_2.id
-  instance_type          = "t2.micro"
+  instance_type          = "t3.micro"
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.instance.id]
   key_name               = var.key_name
