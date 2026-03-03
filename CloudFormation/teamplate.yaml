@@ -68,10 +68,10 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
 
-  EC2InstanceProfile:
+  TimmyInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      InstanceProfileName: EC2S3ReadOnlyInstanceProfile
+      InstanceProfileName: TimmyS3ReadOnlyInstanceProfile
       Roles:
         - !Ref EC2Role
 
@@ -95,7 +95,7 @@ Resources:
       SubnetId: !Ref PublicSubnet
       SecurityGroupIds:
         - !Ref EC2SecurityGroup
-      IamInstanceProfile: !Ref EC2InstanceProfile
+      IamInstanceProfile: !Ref TimmyInstanceProfile
       Tags:
         - Key: Name
           Value: TimmyEC2Instance
