@@ -1,5 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation stack with VPC, EC2, IAM Role and S3 Bucket
+Description: >
+  Task: VPC (10.0.0.0/16) + Public Subnet (10.0.1.0/24) + IGW + RouteTable,
+  EC2 t2.micro (Amazon Linux 2) in public subnet, IAM Role with S3 ReadOnly,
+  private S3 bucket with versioning + bucket policy restriction, outputs.
+  Region adapted to eu-north-1.
 
 Resources:
 
