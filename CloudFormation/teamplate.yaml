@@ -1,33 +1,9 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description: >
-  Task: VPC (10.0.0.0/16) + Public Subnet (10.0.1.0/24) + IGW + RouteTable,
-  EC2 t2.micro (Amazon Linux 2) in public subnet, IAM Role with S3 ReadOnly,
-  private S3 bucket with versioning + bucket policy restriction, outputs.
-  Region adapted to eu-north-1.
-
-Parameters:
-  ProjectName:
-    Type: String
-    Default: cf-task
-    Description: Prefix for naming resources
-
-  BucketName:
-    Type: String
-    Description: Globally unique S3 bucket name (lowercase, no spaces)
-    AllowedPattern: "^[a-z0-9.-]{3,63}$"
-    ConstraintDescription: "Bucket name must be 3-63 chars, lowercase letters/numbers/dot/hyphen only."
-
-  KeyName:
-    Type: AWS::EC2::KeyPair::KeyName
-    Description: EC2 KeyPair name for SSH access
-
-  AmiId:
-    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
-    Description: Amazon Linux 2 AMI ID (resolved via SSM public parameter)
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation stack with VPC, EC2, IAM Role and S3 Bucket
 
 Resources:
-  VPC:
+
+  MyVPC:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: 10.0.0.0/16
@@ -35,75 +11,51 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectName}-vpc"
-
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-        - Key: Name
-          Value: !Sub "${ProjectName}-igw"
-
-  VPCGatewayAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref VPC
-      InternetGatewayId: !Ref InternetGateway
+          Value: MyVPC
 
   PublicSubnet:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref MyVPC
       CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [0, !GetAZs "eu-north-1"]
+      AvailabilityZone: eu-north-1a
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectName}-public-subnet"
+          Value: PublicSubnet
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MyVPC
+      InternetGatewayId: !Ref InternetGateway
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub "${ProjectName}-public-rt"
+      VpcId: !Ref MyVPC
 
-  DefaultRouteToInternet:
+  PublicRoute:
     Type: AWS::EC2::Route
-    DependsOn: VPCGatewayAttachment
+    DependsOn: AttachGateway
     Properties:
       RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-  PublicSubnetRouteTableAssociation:
+  SubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
 
-  InstanceSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Allow SSH from anywhere (task helper)
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-      SecurityGroupEgress:
-        - IpProtocol: "-1"
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Sub "${ProjectName}-sg"
-
-  Ec2S3ReadOnlyRole:
+  EC2Role:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${ProjectName}-ec2-s3-readonly-role"
+      RoleName: EC2S3ReadOnlyRole
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -116,73 +68,65 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
 
-  Ec2InstanceProfile:
+  EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      InstanceProfileName: !Sub "${ProjectName}-ec2-profile"
+      InstanceProfileName: EC2S3ReadOnlyInstanceProfile
       Roles:
-        - !Ref Ec2S3ReadOnlyRole
+        - !Ref EC2Role
 
-  PrivateBucket:
-    Type: AWS::S3::Bucket
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      BucketName: !Ref BucketName
-      VersioningConfiguration:
-        Status: Enabled
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        IgnorePublicAcls: true
-        BlockPublicPolicy: true
-        RestrictPublicBuckets: true
-
-  PrivateBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref PrivateBucket
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: DenyInsecureTransport
-            Effect: Deny
-            Principal: "*"
-            Action: "s3:*"
-            Resource:
-              - !Sub "arn:aws:s3:::${BucketName}"
-              - !Sub "arn:aws:s3:::${BucketName}/*"
-            Condition:
-              Bool:
-                aws:SecureTransport: "false"
-
-          - Sid: DenyAllExceptEc2Role
-            Effect: Deny
-            NotPrincipal:
-              AWS: !GetAtt Ec2S3ReadOnlyRole.Arn
-            Action:
-              - s3:GetObject
-              - s3:ListBucket
-            Resource:
-              - !Sub "arn:aws:s3:::${BucketName}"
-              - !Sub "arn:aws:s3:::${BucketName}/*"
+      GroupDescription: Allow SSH access
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
 
   EC2Instance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Ref AmiId
-      InstanceType: t2.micro
+      InstanceType: t3.micro
+      ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}"
+
       SubnetId: !Ref PublicSubnet
-      KeyName: !Ref KeyName
-      IamInstanceProfile: !Ref Ec2InstanceProfile
       SecurityGroupIds:
-        - !Ref InstanceSecurityGroup
+        - !Ref EC2SecurityGroup
+      IamInstanceProfile: !Ref EC2InstanceProfile
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectName}-ec2"
+          Value: MyEC2Instance
+
+  TimmyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: timmy-bucket-1234567890
+      VersioningConfiguration:
+        Status: Enabled
+
+  TimmyS3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TimmyS3Bucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt EC2Role.Arn
+            Action:
+              - s3:GetObject
+            Resource: !Sub "${TimmyS3Bucket.Arn}/*"
 
 Outputs:
+
   EC2PublicIP:
     Description: Public IP of the EC2 instance
     Value: !GetAtt EC2Instance.PublicIp
 
   S3BucketName:
-    Description: Name of the created S3 bucket
-    Value: !Ref PrivateBucket
+    Description: Name of the S3 bucket
+    Value: !Ref TimmyS3Bucket
