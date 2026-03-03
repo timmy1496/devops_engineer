@@ -159,8 +159,8 @@ Resources:
             Principal: "*"
             Action: "s3:*"
             Resource:
-              - !Sub "arn:aws:s3:::${BucketName}"
-              - !Sub "arn:aws:s3:::${BucketName}/*"
+              - !Sub "arn:aws:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}"
+              - !Sub "arn:aws:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}/*"
             Condition:
               Bool:
                 aws:SecureTransport: "false"
@@ -173,8 +173,8 @@ Resources:
               - s3:GetObject
               - s3:ListBucket
             Resource:
-              - !Sub "arn:aws:s3:::${BucketName}"
-              - !Sub "arn:aws:s3:::${BucketName}/*"
+              - !Sub "arn:aws:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}"
+              - !Sub "arn:aws:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}/*"
 
   EC2Instance:
     Type: AWS::EC2::Instance
