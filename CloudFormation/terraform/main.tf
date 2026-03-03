@@ -10,7 +10,7 @@ terraform {
 }
 
 provider "aws" {
-  region = var.region
+  region = "eu-north-1"
 }
 
 data "aws_ami" "amazon_linux_2" {
@@ -105,7 +105,6 @@ resource "aws_security_group" "instance" {
   }
 
   egress {
-    description = "All egress"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -131,8 +130,6 @@ data "aws_iam_policy_document" "ec2_assume_role" {
 resource "aws_iam_role" "ec2_s3_readonly" {
   name               = "${local.name}-ec2-s3-readonly-role"
   assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
-
-  tags = local.tags
 }
 
 resource "aws_iam_role_policy_attachment" "readonly_attach" {
@@ -147,7 +144,15 @@ resource "aws_iam_instance_profile" "this" {
 
 resource "aws_s3_bucket" "private" {
   bucket = var.bucket_name
-  tags   = local.tags
+
+  force_destroy = false
+
+  tags = local.tags
+}
+
+resource "aws_s3_bucket_location" "private" {
+  bucket = aws_s3_bucket.private.id
+  region = "eu-north-1"
 }
 
 resource "aws_s3_bucket_versioning" "private" {
@@ -167,66 +172,13 @@ resource "aws_s3_bucket_public_access_block" "private" {
   restrict_public_buckets = true
 }
 
-data "aws_iam_policy_document" "bucket_policy" {
-  statement {
-    sid    = "DenyInsecureTransport"
-    effect = "Deny"
-
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-
-    actions = ["s3:*"]
-
-    resources = [
-      aws_s3_bucket.private.arn,
-      "${aws_s3_bucket.private.arn}/*",
-    ]
-
-    condition {
-      test     = "Bool"
-      variable = "aws:SecureTransport"
-      values   = ["false"]
-    }
-  }
-
-  statement {
-    sid    = "DenyAllExceptEc2Role"
-    effect = "Deny"
-
-    not_principals {
-      type        = "AWS"
-      identifiers = [aws_iam_role.ec2_s3_readonly.arn]
-    }
-
-    actions = [
-      "s3:GetObject",
-      "s3:ListBucket",
-    ]
-
-    resources = [
-      aws_s3_bucket.private.arn,
-      "${aws_s3_bucket.private.arn}/*",
-    ]
-  }
-}
-
-resource "aws_s3_bucket_policy" "private" {
-  bucket = aws_s3_bucket.private.id
-  policy = data.aws_iam_policy_document.bucket_policy.json
-
-  depends_on = [aws_s3_bucket_public_access_block.private]
-}
-
 resource "aws_instance" "this" {
   ami                    = data.aws_ami.amazon_linux_2.id
   instance_type          = "t3.micro"
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.instance.id]
   key_name               = var.key_name
-
-  iam_instance_profile = aws_iam_instance_profile.this.name
+  iam_instance_profile   = aws_iam_instance_profile.this.name
 
   tags = merge(local.tags, {
     Name = "${local.name}-ec2"
