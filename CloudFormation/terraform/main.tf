@@ -4,13 +4,13 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 5.0"
+      version = "~> 5.0"
     }
   }
 }
 
 provider "aws" {
-  region = "eu-north-1"
+  region = var.region
 }
 
 data "aws_ami" "amazon_linux_2" {
@@ -150,10 +150,6 @@ resource "aws_s3_bucket" "private" {
   tags = local.tags
 }
 
-resource "aws_s3_bucket_location" "private" {
-  bucket = aws_s3_bucket.private.id
-  region = "eu-north-1"
-}
 
 resource "aws_s3_bucket_versioning" "private" {
   bucket = aws_s3_bucket.private.id
