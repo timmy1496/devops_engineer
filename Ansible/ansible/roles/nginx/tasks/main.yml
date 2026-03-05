@@ -1,0 +1,50 @@
+- name: Install nginx on Amazon Linux 2 (via amazon-linux-extras)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    amazon-linux-extras enable nginx1
+    yum clean metadata
+    yum -y install nginx
+  args:
+    executable: /bin/bash
+  when:
+    - ansible_distribution == "Amazon"
+    - ansible_distribution_major_version == "2"
+  become: true
+
+- name: Install nginx on Amazon Linux 2023 (dnf)
+  ansible.builtin.package:
+    name: nginx
+    state: present
+  when:
+    - ansible_distribution == "Amazon"
+    - ansible_distribution_major_version != "2"
+  become: true
+
+- name: Ensure web root exists
+  ansible.builtin.file:
+    path: /usr/share/nginx/html
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Deploy site index.html
+  ansible.builtin.template:
+    src: index.html.j2
+    dest: /usr/share/nginx/html/index.html
+    mode: "0644"
+  become: true
+
+- name: Deploy nginx config
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/conf.d/default.conf
+    mode: "0644"
+  notify: Reload nginx
+  become: true
+
+- name: Ensure nginx started and enabled
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+  become: true

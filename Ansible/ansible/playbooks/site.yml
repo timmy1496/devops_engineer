@@ -1,0 +1,7 @@
+- name: Full server setup (Amazon Linux)
+  hosts: all
+  become: true
+  roles:
+    - baseline
+    - firewall
+    - nginx
