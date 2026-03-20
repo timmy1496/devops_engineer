@@ -1,0 +1,237 @@
+---
+# Web server: Nginx + Node Exporter + Promtail + Nginx Prometheus Exporter
+
+# ─── Nginx ──────────────────────────────────────────────────────────────────
+- name: Install Nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: true
+
+- name: Deploy Nginx main config
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    mode: "0644"
+    validate: nginx -t -c %s
+  notify: Reload nginx
+
+- name: Deploy default site config (enables stub_status for metrics)
+  template:
+    src: nginx-default.conf.j2
+    dest: /etc/nginx/sites-available/default
+    mode: "0644"
+    validate: nginx -t -c /etc/nginx/nginx.conf
+  notify: Reload nginx
+
+- name: Enable nginx site
+  file:
+    src: /etc/nginx/sites-available/default
+    dest: /etc/nginx/sites-enabled/default
+    state: link
+
+- name: Ensure Nginx is started and enabled
+  systemd:
+    name: nginx
+    state: started
+    enabled: true
+
+# ─── Node Exporter ──────────────────────────────────────────────────────────
+- name: Create node_exporter user
+  user:
+    name: node_exporter
+    shell: /sbin/nologin
+    system: true
+    create_home: false
+
+- name: Check if Node Exporter already installed
+  stat:
+    path: /usr/local/bin/node_exporter
+  register: node_exporter_binary
+
+- name: Download Node Exporter
+  get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: /tmp/node_exporter.tar.gz
+    mode: "0644"
+  when: not node_exporter_binary.stat.exists
+
+- name: Extract Node Exporter
+  unarchive:
+    src: /tmp/node_exporter.tar.gz
+    dest: /tmp/
+    remote_src: true
+  when: not node_exporter_binary.stat.exists
+
+- name: Install Node Exporter binary
+  copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    owner: node_exporter
+    group: node_exporter
+    mode: "0755"
+    remote_src: true
+  when: not node_exporter_binary.stat.exists
+  notify: Restart node_exporter
+
+- name: Create Node Exporter systemd service
+  template:
+    src: node-exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart node_exporter
+
+- name: Start and enable Node Exporter
+  systemd:
+    name: node_exporter
+    state: started
+    enabled: true
+    daemon_reload: true
+
+# ─── Nginx Prometheus Exporter ───────────────────────────────────────────────
+- name: Check if nginx-prometheus-exporter already installed
+  stat:
+    path: /usr/local/bin/nginx-prometheus-exporter
+  register: nginx_exporter_binary
+
+- name: Download nginx-prometheus-exporter
+  get_url:
+    url: "https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v1.1.0/nginx-prometheus-exporter_1.1.0_linux_amd64.tar.gz"
+    dest: /tmp/nginx-prometheus-exporter.tar.gz
+    mode: "0644"
+  when: not nginx_exporter_binary.stat.exists
+
+- name: Extract nginx-prometheus-exporter
+  unarchive:
+    src: /tmp/nginx-prometheus-exporter.tar.gz
+    dest: /tmp/nginx-exporter/
+    remote_src: true
+    creates: /tmp/nginx-exporter/nginx-prometheus-exporter
+  when: not nginx_exporter_binary.stat.exists
+
+- name: Install nginx-prometheus-exporter binary
+  copy:
+    src: /tmp/nginx-exporter/nginx-prometheus-exporter
+    dest: /usr/local/bin/nginx-prometheus-exporter
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  when: not nginx_exporter_binary.stat.exists
+  notify: Restart nginx_exporter
+
+- name: Create nginx-prometheus-exporter systemd service
+  template:
+    src: nginx-exporter.service.j2
+    dest: /etc/systemd/system/nginx-prometheus-exporter.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart nginx_exporter
+
+- name: Start and enable nginx-prometheus-exporter
+  systemd:
+    name: nginx-prometheus-exporter
+    state: started
+    enabled: true
+    daemon_reload: true
+
+# ─── Promtail (web server) ───────────────────────────────────────────────────
+- name: Check if Promtail already installed
+  stat:
+    path: /usr/local/bin/promtail
+  register: promtail_binary
+
+- name: Download Promtail
+  get_url:
+    url: "https://github.com/grafana/loki/releases/download/v{{ promtail_version }}/promtail-linux-amd64.zip"
+    dest: /tmp/promtail.zip
+    mode: "0644"
+  when: not promtail_binary.stat.exists
+
+- name: Install unzip
+  apt:
+    name: unzip
+    state: present
+
+- name: Extract Promtail
+  unarchive:
+    src: /tmp/promtail.zip
+    dest: /tmp/
+    remote_src: true
+  when: not promtail_binary.stat.exists
+
+- name: Install Promtail binary
+  copy:
+    src: /tmp/promtail-linux-amd64
+    dest: /usr/local/bin/promtail
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  when: not promtail_binary.stat.exists
+  notify: Restart promtail_service
+
+- name: Create Promtail config directory
+  file:
+    path: /etc/promtail
+    state: directory
+    mode: "0755"
+
+- name: Deploy Promtail configuration
+  template:
+    src: promtail-config-webserver.yml.j2
+    dest: /etc/promtail/promtail-config.yml
+    mode: "0644"
+  notify: Restart promtail_service
+
+- name: Create Promtail systemd service
+  template:
+    src: promtail.service.j2
+    dest: /etc/systemd/system/promtail.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart promtail_service
+
+- name: Add promtail user to adm group (for log access)
+  user:
+    name: root
+    groups: adm
+    append: true
+
+- name: Start and enable Promtail
+  systemd:
+    name: promtail
+    state: started
+    enabled: true
+    daemon_reload: true
+
+# ─── Verify services ────────────────────────────────────────────────────────
+- name: Wait for Node Exporter to be ready
+  uri:
+    url: "http://localhost:9100/metrics"
+    status_code: 200
+  register: node_exporter_ready
+  until: node_exporter_ready.status == 200
+  retries: 10
+  delay: 3
+
+- name: Check Nginx is serving
+  uri:
+    url: "http://localhost:80"
+    status_code: 200
+  register: nginx_check
+  until: nginx_check.status == 200
+  retries: 5
+  delay: 2
+
+- name: Print webserver info
+  debug:
+    msg:
+      - "✅ Nginx:              http://{{ ansible_host }}:80"
+      - "✅ Node Exporter:      http://{{ ansible_host }}:9100/metrics"
+      - "✅ Nginx Exporter:     http://{{ ansible_host }}:9113/metrics"
+      - "✅ Promtail:           running (pushing logs to Loki)"

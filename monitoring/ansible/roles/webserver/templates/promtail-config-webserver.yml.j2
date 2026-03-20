@@ -1,0 +1,105 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions-webserver.yaml
+
+clients:
+  - url: http://{{ monitoring_private_ip }}:3100/loki/api/v1/push
+    tenant_id: webserver
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+scrape_configs:
+
+  # ─── Nginx Access Log (JSON format) ──────────────────────────────────────
+  - job_name: nginx-access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-access
+          host: web-server
+          environment: dev
+          __path__: /var/log/nginx/access.log
+    pipeline_stages:
+      # Парсимо JSON-формат який ми задали в nginx.conf
+      - json:
+          expressions:
+            time:        time
+            remote_addr: remote_addr
+            method:      method
+            uri:         uri
+            status:      status
+            bytes_sent:  bytes_sent
+            request_time: request_time
+            user_agent:  http_user_agent
+      - labels:
+          method:
+          status:
+          uri:
+      - metrics:
+          http_requests_total:
+            type: Counter
+            description: "Total HTTP requests"
+            source: status
+            config:
+              action: inc
+      - timestamp:
+          source: time
+          format: "2006-01-02T15:04:05+00:00"
+
+  # ─── Nginx Error Log ──────────────────────────────────────────────────────
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-error
+          host: web-server
+          environment: dev
+          __path__: /var/log/nginx/error.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<time>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<message>.*)'
+      - labels:
+          level:
+      - timestamp:
+          source: time
+          format: "2006/01/02 15:04:05"
+
+  # ─── System Syslog ────────────────────────────────────────────────────────
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          host: web-server
+          environment: dev
+          __path__: /var/log/syslog
+
+  # ─── Auth Log ─────────────────────────────────────────────────────────────
+  - job_name: auth
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: auth
+          host: web-server
+          environment: dev
+          __path__: /var/log/auth.log
+
+  # ─── Kernel / dmesg ───────────────────────────────────────────────────────
+  - job_name: kern
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: kern
+          host: web-server
+          environment: dev
+          __path__: /var/log/kern.log

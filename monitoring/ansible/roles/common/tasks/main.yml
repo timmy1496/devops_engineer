@@ -1,0 +1,53 @@
+---
+# Common tasks for all servers
+
+- name: Update apt cache
+  apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install common packages
+  apt:
+    name:
+      - curl
+      - wget
+      - unzip
+      - htop
+      - vim
+      - git
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - python3-pip
+      - apt-transport-https
+      - software-properties-common
+    state: present
+
+- name: Set timezone to UTC
+  timezone:
+    name: UTC
+
+- name: Configure sysctl — increase file descriptors
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+  loop:
+    - { name: "fs.file-max", value: "65535" }
+    - { name: "vm.swappiness", value: "10" }
+
+- name: Create monitoring system group
+  group:
+    name: monitoring
+    system: true
+    state: present
+
+- name: Create monitoring system user
+  user:
+    name: monitoring
+    group: monitoring
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+    state: present

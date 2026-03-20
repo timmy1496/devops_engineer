@@ -1,0 +1,29 @@
+---
+- name: Reload nginx
+  systemd:
+    name: nginx
+    state: reloaded
+
+- name: Restart nginx
+  systemd:
+    name: nginx
+    state: restarted
+
+- name: Restart node_exporter
+  systemd:
+    name: node_exporter
+    state: restarted
+
+- name: Restart nginx_exporter
+  systemd:
+    name: nginx-prometheus-exporter
+    state: restarted
+
+- name: Restart promtail_service
+  systemd:
+    name: promtail
+    state: restarted
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: true
