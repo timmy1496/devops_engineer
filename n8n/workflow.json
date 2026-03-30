@@ -1,0 +1,249 @@
+{
+  "name": "Support Form → DB → Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "support-form",
+        "options": {}
+      },
+      "id": "9da5782a-ec8a-4f91-9848-b2b0974b0cfc",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "support-form"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "name",
+              "value": "={{$json[\"body\"][\"name\"]}}"
+            },
+            {
+              "name": "email",
+              "value": "={{$json[\"body\"][\"email\"]}}"
+            },
+            {
+              "name": "type",
+              "value": "={{$json[\"body\"][\"type\"]}}"
+            },
+            {
+              "name": "description",
+              "value": "={{$json[\"body\"][\"description\"]}}"
+            },
+            {
+              "name": "priority",
+              "value": "={{$json[\"body\"][\"priority\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "25759ddc-b139-4961-9d95-fd88bc2d6267",
+      "name": "Extract Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM requests WHERE email = '{{$json[\"email\"]}}';",
+        "options": {}
+      },
+      "id": "a02a940c-2564-4798-8b24-248bc372ed83",
+      "name": "Check Duplicate Email",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "CqYPnWedGZTSf667",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $('Extract Fields').item.json.body.email }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "e05c5329-bb19-43f1-a7cf-a79f26736b5e",
+      "name": "Is New Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        608,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO requests (name,email,request_type,description,priority,status) VALUES ('{{$json[\"name\"]}}','{{$json[\"email\"]}}','{{$json[\"type\"]}}','{{$json[\"description\"]}}','{{$json[\"priority\"]}}','created');",
+        "options": {}
+      },
+      "id": "e875625a-8cc3-4aa0-b55c-bf8203c00653",
+      "name": "Insert Request",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "CqYPnWedGZTSf667",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "315257894",
+        "text": "=📩 Нова заявка\n\n👤 Name: {{ $('Extract Fields').item.json.body.name }}\n📧 Email: {{ $('Extract Fields').item.json.body.email }}\n📂 Type: {{ $('Extract Fields').item.json.body.type }}\n⚡ Priority: {{ $('Extract Fields').item.json.body.priority }}\n\n📝 Description:{{ $('Extract Fields').item.json.body.description }}\n",
+        "replyMarkup": "=",
+        "forceReply": {},
+        "replyKeyboardOptions": {},
+        "replyKeyboardRemove": {},
+        "additionalFields": {}
+      },
+      "id": "96407dd0-dcd9-4e3e-844c-aa3027525495",
+      "name": "Send Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        0
+      ],
+      "webhookId": "0b3ba77f-64b6-4ed5-9003-2902c64200f8",
+      "credentials": {
+        "telegramApi": {
+          "id": "4eUw2rrqNdtLXAcG",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE requests SET status='sent' WHERE email='{{$json[\"email\"]}}';",
+        "options": {}
+      },
+      "id": "cd153584-b9f9-425e-b48a-0d4dde042fcc",
+      "name": "Update Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "CqYPnWedGZTSf667",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Fields": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Email": {
+      "main": [
+        [
+          {
+            "node": "Is New Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Email?": {
+      "main": [
+        [
+          {
+            "node": "Insert Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Request": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram": {
+      "main": [
+        [
+          {
+            "node": "Update Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "cf0114bc-0bed-4d06-9807-d13a777b3b5a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "33d3118021c86740b1a15c617d0d9d55d063df19d7374e00a1b8953c3734f20d"
+  },
+  "id": "3IX3LZe3Ps90yuuL",
+  "tags": []
+}
