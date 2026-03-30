@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: falco
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: falco
+spec:
+  selector:
+    matchLabels:
+      app: falco
+  template:
+    metadata:
+      labels:
+        app: falco
+    spec:
+      serviceAccountName: falco
+      hostPID: {{ .Values.host.hostPID }}
+      hostNetwork: {{ .Values.host.hostNetwork }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      containers:
+        - name: falco
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: {{ .Values.securityContext.privileged }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.mounts.proc.enabled }}
+            - name: host-proc
+              mountPath: {{ .Values.mounts.proc.mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.mounts.boot.enabled }}
+            - name: host-boot
+              mountPath: {{ .Values.mounts.boot.mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.mounts.libModules.enabled }}
+            - name: host-lib-modules
+              mountPath: {{ .Values.mounts.libModules.mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.mounts.usr.enabled }}
+            - name: host-usr
+              mountPath: {{ .Values.mounts.usr.mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.mounts.dockerSock.enabled }}
+            - name: docker-sock
+              mountPath: {{ .Values.mounts.dockerSock.mountPath }}
+              readOnly: true
+            {{- end }}
+      volumes:
+        {{- if .Values.mounts.proc.enabled }}
+        - name: host-proc
+          hostPath:
+            path: {{ .Values.mounts.proc.hostPath }}
+            type: {{ .Values.mounts.proc.type }}
+        {{- end }}
+        {{- if .Values.mounts.boot.enabled }}
+        - name: host-boot
+          hostPath:
+            path: {{ .Values.mounts.boot.hostPath }}
+            type: {{ .Values.mounts.boot.type }}
+        {{- end }}
+        {{- if .Values.mounts.libModules.enabled }}
+        - name: host-lib-modules
+          hostPath:
+            path: {{ .Values.mounts.libModules.hostPath }}
+            type: {{ .Values.mounts.libModules.type }}
+        {{- end }}
+        {{- if .Values.mounts.usr.enabled }}
+        - name: host-usr
+          hostPath:
+            path: {{ .Values.mounts.usr.hostPath }}
+            type: {{ .Values.mounts.usr.type }}
+        {{- end }}
+        {{- if .Values.mounts.dockerSock.enabled }}
+        - name: docker-sock
+          hostPath:
+            path: {{ .Values.mounts.dockerSock.hostPath }}
+            type: {{ .Values.mounts.dockerSock.type }}
+        {{- end }}
