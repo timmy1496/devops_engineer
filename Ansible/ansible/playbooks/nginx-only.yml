@@ -1,0 +1,5 @@
+- name: Nginx only
+  hosts: all
+  become: true
+  roles:
+    - nginx

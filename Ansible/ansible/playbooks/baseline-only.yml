@@ -1,0 +1,5 @@
+- name: Baseline only
+  hosts: all
+  become: true
+  roles:
+    - baseline

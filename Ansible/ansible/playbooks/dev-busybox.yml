@@ -1,0 +1,13 @@
+- name: Dev test - run simple command on hosts
+  hosts: all
+  become: false
+  tasks:
+    - name: Print system info
+      ansible.builtin.shell: |
+        uname -a
+        id
+      register: out
+
+    - name: Show output
+      ansible.builtin.debug:
+        var: out.stdout_lines

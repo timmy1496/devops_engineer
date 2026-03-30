@@ -1,0 +1,22 @@
+ansible_user: ec2-user
+
+baseline_packages:
+  - vim
+  - git
+  - mc
+  - ufw
+
+ssh_users:
+  - name: ec2-user
+    public_key_path: "~/.ssh/id_ed25519.pub"
+
+firewalld_allow_services:
+  - ssh
+  - http
+
+nginx_server_name: "_"
+nginx_listen_port: 80
+
+site_title: "Hello from Ansible"
+site_heading: "It works on Amazon Linux!"
+site_message: "Served by Nginx + Ansible templates"
