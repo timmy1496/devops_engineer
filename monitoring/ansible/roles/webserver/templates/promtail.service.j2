@@ -1,0 +1,18 @@
+[Unit]
+Description=Promtail — Loki Log Shipper
+Documentation=https://grafana.com/docs/loki/latest/clients/promtail/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/promtail \
+    -config.file=/etc/promtail/promtail-config.yml \
+    -log.level=info
+
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

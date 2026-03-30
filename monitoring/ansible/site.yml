@@ -1,0 +1,32 @@
+---
+# ============================================================
+# Main Ansible Playbook — Monitoring Stack
+# ============================================================
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini site.yml
+#   ansible-playbook -i inventory/hosts.ini site.yml --tags monitoring
+#   ansible-playbook -i inventory/hosts.ini site.yml --tags webserver
+# ============================================================
+
+- name: Bootstrap all servers
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - common
+
+- name: Deploy monitoring stack (Prometheus + Grafana + Loki + Promtail)
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  tags: monitoring
+  roles:
+    - monitoring
+
+- name: Deploy web server (Nginx + Node Exporter + Promtail)
+  hosts: webservers
+  become: true
+  gather_facts: true
+  tags: webserver
+  roles:
+    - webserver

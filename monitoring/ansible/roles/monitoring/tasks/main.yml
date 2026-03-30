@@ -1,0 +1,220 @@
+---
+# Monitoring server: Docker + Docker Compose + Prometheus + Grafana + Loki + Promtail
+
+# ─── Docker Installation ────────────────────────────────────────────────────
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+
+- name: Install Docker and Docker Compose plugin
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+
+- name: Ensure Docker service is started and enabled
+  systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Add ubuntu user to docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: true
+
+# ─── Directory Structure ────────────────────────────────────────────────────
+- name: Create monitoring directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /opt/monitoring
+    - /opt/monitoring/prometheus
+    - /opt/monitoring/grafana
+    - /opt/monitoring/grafana/provisioning
+    - /opt/monitoring/grafana/provisioning/datasources
+    - /opt/monitoring/grafana/provisioning/dashboards
+    - /opt/monitoring/grafana/dashboards
+    - /opt/monitoring/loki
+    - /opt/monitoring/promtail
+    - /data/prometheus
+    - /data/grafana
+    - /data/loki
+
+- name: Set permissions on data directories
+  file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0755"
+    recurse: true
+  loop:
+    - { path: /data/prometheus, owner: "65534" }  # nobody
+    - { path: /data/grafana,    owner: "472"    }  # grafana
+    - { path: /data/loki,       owner: "10001"  }  # loki
+
+# ─── Configuration Files ────────────────────────────────────────────────────
+- name: Deploy Prometheus configuration
+  template:
+    src: prometheus.yml.j2
+    dest: /opt/monitoring/prometheus/prometheus.yml
+    mode: "0644"
+  notify: Restart prometheus
+
+- name: Deploy Loki configuration
+  template:
+    src: loki-config.yml.j2
+    dest: /opt/monitoring/loki/loki-config.yml
+    mode: "0644"
+  notify: Restart loki
+
+- name: Deploy Promtail configuration (monitoring server)
+  template:
+    src: promtail-config-monitoring.yml.j2
+    dest: /opt/monitoring/promtail/promtail-config.yml
+    mode: "0644"
+  notify: Restart promtail
+
+- name: Deploy Grafana datasources provisioning
+  template:
+    src: grafana-datasources.yml.j2
+    dest: /opt/monitoring/grafana/provisioning/datasources/datasources.yml
+    mode: "0644"
+  notify: Restart grafana
+
+- name: Deploy Grafana dashboard provisioning config
+  template:
+    src: grafana-dashboard-provider.yml.j2
+    dest: /opt/monitoring/grafana/provisioning/dashboards/provider.yml
+    mode: "0644"
+  notify: Restart grafana
+
+- name: Deploy Grafana environment config
+  template:
+    src: grafana.env.j2
+    dest: /opt/monitoring/grafana/grafana.env
+    mode: "0600"
+
+- name: Deploy Docker Compose file
+  template:
+    src: docker-compose.yml.j2
+    dest: /opt/monitoring/docker-compose.yml
+    mode: "0644"
+  notify: Restart monitoring stack
+
+# ─── Start Services ─────────────────────────────────────────────────────────
+- name: Pull Docker images
+  shell: docker compose -f /opt/monitoring/docker-compose.yml pull
+  changed_when: false
+
+- name: Start monitoring stack
+  shell: docker compose -f /opt/monitoring/docker-compose.yml up -d
+  register: compose_up
+  changed_when: "'Started' in compose_up.stdout or 'Created' in compose_up.stdout"
+
+- name: Create systemd service for monitoring stack
+  template:
+    src: monitoring-stack.service.j2
+    dest: /etc/systemd/system/monitoring-stack.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Enable monitoring-stack service
+
+- name: Wait for Prometheus to be ready
+  uri:
+    url: "http://localhost:9090/-/ready"
+    status_code: 200
+  register: prometheus_ready
+  until: prometheus_ready.status == 200
+  retries: 30
+  delay: 5
+
+- name: Wait for Grafana to be ready
+  uri:
+    url: "http://localhost:3000/api/health"
+    status_code: 200
+  register: grafana_ready
+  until: grafana_ready.status == 200
+  retries: 30
+  delay: 5
+
+- name: Wait for Loki to be ready
+  uri:
+    url: "http://localhost:3100/ready"
+    status_code: 200
+  register: loki_ready
+  until: loki_ready.status == 200
+  retries: 30
+  delay: 5
+
+- name: Print monitoring stack URLs
+  debug:
+    msg:
+      - "✅ Grafana:    http://{{ ansible_host }}:3000  (admin / {{ grafana_admin_password }})"
+      - "✅ Prometheus: http://{{ ansible_host }}:9090"
+      - "✅ Loki:       http://{{ ansible_host }}:3100"
+
+# ─── Node Exporter on monitoring server ─────────────────────────────────────
+- name: Create node_exporter user
+  user:
+    name: node_exporter
+    shell: /sbin/nologin
+    system: true
+    create_home: false
+
+- name: Download Node Exporter
+  get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: /tmp/node_exporter.tar.gz
+    mode: "0644"
+
+- name: Extract and install Node Exporter
+  shell: |
+    tar -xzf /tmp/node_exporter.tar.gz -C /tmp/
+    cp /tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter /usr/local/bin/
+    chmod +x /usr/local/bin/node_exporter
+  args:
+    creates: /usr/local/bin/node_exporter
+
+- name: Create Node Exporter systemd service
+  copy:
+    dest: /etc/systemd/system/node_exporter.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Prometheus Node Exporter
+      After=network-online.target
+
+      [Service]
+      Type=simple
+      User=node_exporter
+      ExecStart=/usr/local/bin/node_exporter --web.listen-address=:9100
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Start and enable Node Exporter
+  systemd:
+    name: node_exporter
+    state: started
+    enabled: true
+    daemon_reload: true

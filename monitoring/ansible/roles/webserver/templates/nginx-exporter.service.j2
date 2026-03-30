@@ -1,0 +1,25 @@
+[Unit]
+Description=Nginx Prometheus Exporter
+Documentation=https://github.com/nginxinc/nginx-prometheus-exporter
+After=network-online.target nginx.service
+Wants=network-online.target
+Requires=nginx.service
+
+[Service]
+Type=simple
+User=nobody
+Group=nogroup
+ExecStart=/usr/local/bin/nginx-prometheus-exporter \
+    --nginx.scrape-uri=http://127.0.0.1/nginx_status \
+    --web.listen-address=:9113 \
+    --log.level=info
+
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
